@@ -3,26 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-from fastapi import Depends, HTTPException
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-
-from . import db
-from .settings import settings
-
-
-@dataclass(frozen=True)
-class Principal:
-    tenant: str
-    device_id: Optional[str]  # if set, key is scoped to a single device
-
-
-bearer = HTTPBearer(auto_error=False)
-
-from __future__ import annotations
-
-from dataclasses import dataclass
-from typing import Optional
-
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -84,6 +64,7 @@ def get_principal(
         return Principal(tenant=public_tenant, device_id=None, is_public_readonly=True)
 
     raise HTTPException(status_code=401, detail="missing bearer token")
+
 def Xget_principal(creds: HTTPAuthorizationCredentials | None = Depends(bearer)) -> Principal:
     if not settings.auth_required:
         # Dev fallback: allow demo tenant, unscoped
