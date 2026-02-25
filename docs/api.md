@@ -1,14 +1,16 @@
 
-### `docs/api.md`
-```md
+
 # Cloud API (v1)
 
-Auth (MVP):
-- `Authorization: Bearer <api_key>` (optional enforcement in later milestone; scaffolding only in commit #1)
+Auth:
+- `Authorization: Bearer <api_key>`
 
 ## Endpoints
 - `GET /healthz`
+- `GET /readyz`
 - `POST /v1/ingest`
-- `GET /v1/devices`
-- `GET /v1/devices/{device_id}/latest`
-- `GET /v1/devices/{device_id}/series?metric=...&from=...&to=...&limit=...`
+
+Tenant-scoped:
+- `GET /v1/tenants/{tenant}/devices`
+- `GET /v1/tenants/{tenant}/devices/{device_id}/latest`
+- `GET /v1/tenants/{tenant}/devices/{device_id}/series?metric=&from_ts=&to_ts=&limit=`

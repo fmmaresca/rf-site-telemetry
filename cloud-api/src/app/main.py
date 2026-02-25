@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import timezone
 from typing import Any, Dict, List, Union
 
-from fastapi import FastAPI, HTTPException
-from pydantic import ValidationError
+from fastapi import Depends, FastAPI, HTTPException
 
 from . import db
+from .auth import Principal, get_principal
 from .models import IngestResult, TelemetryBatchV1, TelemetryEventV1
 
-app = FastAPI(title="RF Site Telemetry Cloud API", version="0.1.0")
+app = FastAPI(title="RF Site Telemetry Cloud API", version="0.2.0")
 
 
 @app.get("/healthz")
@@ -17,11 +17,32 @@ def healthz() -> Dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/readyz")
+def readyz() -> Dict[str, str]:
+    try:
+        with db.get_conn() as conn, conn.cursor() as cur:
+            cur.execute("SELECT 1 AS ok")
+            cur.fetchone()
+        return {"status": "ready"}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"db not ready: {e}")
+
+
+def _enforce_scope(principal: Principal, tenant: str, device_id: str | None = None) -> None:
+    if principal.tenant != tenant:
+        raise HTTPException(status_code=403, detail="tenant forbidden")
+    if principal.device_id is not None and device_id is not None and principal.device_id != device_id:
+        raise HTTPException(status_code=403, detail="device forbidden")
+
+
 @app.post("/v1/ingest", response_model=IngestResult, status_code=202)
-def ingest(payload: Union[TelemetryEventV1, TelemetryBatchV1]) -> IngestResult:
+def ingest(
+    payload: Union[TelemetryEventV1, TelemetryBatchV1],
+    principal: Principal = Depends(get_principal),
+) -> IngestResult:
     # Normalize to list of events
     if isinstance(payload, TelemetryEventV1):
-        events: List[TelemetryEventV1] = [payload]
+        events = [payload]
         tenant = payload.tenant
         device_id = payload.device_id
     else:
@@ -29,23 +50,24 @@ def ingest(payload: Union[TelemetryEventV1, TelemetryBatchV1]) -> IngestResult:
         tenant = payload.tenant
         device_id = payload.device_id
 
-    counts = db.IngestCounts()
+    _enforce_scope(principal, tenant, device_id)
+
+    accepted = deduped = rejected = 0
 
     try:
         with db.get_conn() as conn:
             conn.autocommit = False
             db.ensure_tenant_and_device(conn, tenant, device_id)
 
-            accepted = deduped = rejected = 0
-
             for ev in events:
-                # Basic consistency guard: batch tenant/device must match
+                # Batch consistency guard
                 if ev.tenant != tenant or ev.device_id != device_id:
                     rejected += 1
                     continue
 
                 ts_utc = ev.ts.astimezone(timezone.utc)
-                inserted, was_deduped = db.insert_event_idempotent(
+
+                inserted = db.insert_event_idempotent(
                     conn=conn,
                     tenant=tenant,
                     device_id=device_id,
@@ -58,83 +80,54 @@ def ingest(payload: Union[TelemetryEventV1, TelemetryBatchV1]) -> IngestResult:
                 if inserted:
                     accepted += 1
                     db.upsert_last_seen(conn, tenant, device_id, ts_utc)
-                elif was_deduped:
-                    deduped += 1
                 else:
-                    rejected += 1
+                    deduped += 1
 
             conn.commit()
-            return IngestResult(accepted=accepted, deduped=deduped, rejected=rejected)
 
+        return IngestResult(accepted=accepted, deduped=deduped, rejected=rejected)
+
+    except HTTPException:
+        raise
     except Exception as e:
-        # Keep it simple in commit #1
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/v1/devices")
-def list_devices() -> List[Dict[str, Any]]:
-    with db.get_conn() as conn, conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT tenant, device_id, created_at, last_seen_at
-              FROM devices
-             ORDER BY tenant, device_id
-            """
-        )
-        return list(cur.fetchall())
+@app.get("/v1/tenants/{tenant}/devices")
+def list_devices(
+    tenant: str,
+    principal: Principal = Depends(get_principal),
+) -> List[Dict[str, Any]]:
+    _enforce_scope(principal, tenant)
+    with db.get_conn() as conn:
+        return db.list_devices(conn, tenant)
 
 
-@app.get("/v1/devices/{device_id}/latest")
-def latest(device_id: str, tenant: str = "demo") -> Dict[str, Any]:
-    with db.get_conn() as conn, conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT tenant, device_id, ts, seq, msg_id, metrics, status
-              FROM telemetry
-             WHERE tenant = %s AND device_id = %s
-             ORDER BY ts DESC
-             LIMIT 1
-            """,
-            (tenant, device_id),
-        )
-        row = cur.fetchone()
+@app.get("/v1/tenants/{tenant}/devices/{device_id}/latest")
+def latest(
+    tenant: str,
+    device_id: str,
+    principal: Principal = Depends(get_principal),
+) -> Dict[str, Any]:
+    _enforce_scope(principal, tenant, device_id)
+    with db.get_conn() as conn:
+        row = db.get_latest(conn, tenant, device_id)
         if not row:
             raise HTTPException(status_code=404, detail="no data")
         return row
 
 
-@app.get("/v1/devices/{device_id}/series")
+@app.get("/v1/tenants/{tenant}/devices/{device_id}/series")
 def series(
+    tenant: str,
     device_id: str,
     metric: str,
-    tenant: str = "demo",
     from_ts: str | None = None,
     to_ts: str | None = None,
     limit: int = 2000,
+    principal: Principal = Depends(get_principal),
 ) -> List[Dict[str, Any]]:
-    # MVP: parse ISO timestamps loosely; default last N points
-    where = ["tenant = %s", "device_id = %s", "metrics ? %s"]
-    params: List[Any] = [tenant, device_id, metric]
-
-    if from_ts:
-        where.append("ts >= %s")
-        params.append(from_ts)
-    if to_ts:
-        where.append("ts <= %s")
-        params.append(to_ts)
-
-    q = f"""
-        SELECT ts, (metrics->>%s)::double precision AS value
-          FROM telemetry
-         WHERE {" AND ".join(where)}
-         ORDER BY ts ASC
-         LIMIT %s
-    """
-    # metric used twice: for select and for "metrics ?"
-    # params already has metric for "metrics ? %s"; add first select metric
-    params2 = [metric] + params + [limit]
-
-    with db.get_conn() as conn, conn.cursor() as cur:
-        cur.execute(q, params2)
-        rows = cur.fetchall()
-        return [{"ts": r["ts"], "value": r["value"]} for r in rows]
+    _enforce_scope(principal, tenant, device_id)
+    limit = max(1, min(limit, 10000))
+    with db.get_conn() as conn:
+        return db.get_series(conn, tenant, device_id, metric, from_ts, to_ts, limit)

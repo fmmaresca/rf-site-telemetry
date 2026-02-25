@@ -1,0 +1,27 @@
+[Unit]
+Description=RF Site Telemetry Cloud API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/rfsite/cloud-api
+EnvironmentFile=/etc/rfsite-cloud-api/env
+
+# venv uvicorn
+ExecStart=/opt/rfsite/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8001
+
+Restart=always
+RestartSec=2
+
+# hardening básico (ajustable)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/rfsite /tmp
+
+[Install]
+WantedBy=multi-user.target
