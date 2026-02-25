@@ -1,8 +1,3 @@
-
----
-
-## `tools/api_keys/create_api_key.py`
-```python
 #!/usr/bin/env python3
 from __future__ import annotations
 
