@@ -1,0 +1,13 @@
+[Unit]
+Description=RF Site Telemetry Edge Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -m agent.main --config /etc/rfsite-telemetry/config.yaml
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
