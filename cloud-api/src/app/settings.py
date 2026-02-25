@@ -6,6 +6,6 @@ class Settings(BaseSettings):
 
     db_dsn: str = "postgresql://rftelemetry:rftelemetry@localhost:5432/rftelemetry"
     auth_required: bool = True  # in cloud: keep True; in local dev you can set AUTH_REQUIRED=0
-
+    public_readonly_tenant: str | None = None  # e.g. "demo"
 
 settings = Settings()
