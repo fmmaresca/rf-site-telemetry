@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Optional
 
-import psycopg
+import psycopg:
 from psycopg.rows import dict_row
 
 from .settings import settings

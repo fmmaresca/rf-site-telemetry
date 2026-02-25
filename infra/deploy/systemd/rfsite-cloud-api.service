@@ -10,13 +10,13 @@ Group=www-data
 WorkingDirectory=/opt/rfsite/cloud-api
 EnvironmentFile=/etc/rfsite-cloud-api/env
 
-# venv uvicorn
+# Ajustá path al venv real
 ExecStart=/opt/rfsite/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8001
 
 Restart=always
 RestartSec=2
 
-# hardening básico (ajustable)
+# hardening razonable
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
