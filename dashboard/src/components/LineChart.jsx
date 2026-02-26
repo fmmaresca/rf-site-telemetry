@@ -1,25 +1,29 @@
 import React, { useEffect, useRef } from "react";
 import { Chart } from "chart.js/auto";
 
+function tsKey(ts) {
+  return String(ts);
+}
+
 /**
  * datasets: [{ label: string, points: [{ts, value}] }]
+ * Unifies timestamps across datasets and aligns values by timestamp.
  */
 export default function LineChart({ title, datasets, height = 280 }) {
   const canvasRef = useRef(null);
   const chartRef = useRef(null);
 
   useEffect(() => {
-    // create once
     chartRef.current = new Chart(canvasRef.current, {
       type: "line",
       data: { labels: [], datasets: [] },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        scales: { x: { ticks: { maxTicksLimit: 8 } } },
         interaction: { mode: "index", intersect: false },
         plugins: { legend: { display: true } },
         elements: { point: { radius: 0 } },
+        scales: { x: { ticks: { maxTicksLimit: 8 } } },
       },
     });
 
@@ -32,17 +36,43 @@ export default function LineChart({ title, datasets, height = 280 }) {
   useEffect(() => {
     if (!chartRef.current) return;
 
-    // Build a unified x-axis based on first dataset timestamps (MVP)
-    const base = datasets?.[0]?.points ?? [];
-    const labels = base.map((p) => new Date(p.ts).toLocaleString());
+    const dss = datasets || [];
+
+    // 1) collect all timestamps across all datasets
+    const tsSet = new Set();
+    for (const ds of dss) {
+      for (const p of (ds.points || [])) {
+        if (p?.ts) tsSet.add(tsKey(p.ts));
+      }
+    }
+
+    // If no points, clear chart
+    if (tsSet.size === 0) {
+      chartRef.current.data.labels = [];
+      chartRef.current.data.datasets = [];
+      chartRef.current.update();
+      return;
+    }
+
+    // 2) sorted timestamps (ISO strings sort OK)
+    const tsList = Array.from(tsSet).sort();
+    const labels = tsList.map((ts) => new Date(ts).toLocaleString());
+
+    // 3) build aligned series (missing points -> null)
+    const chartDatasets = dss.map((ds) => {
+      const m = new Map();
+      for (const p of (ds.points || [])) {
+        if (p?.ts) m.set(tsKey(p.ts), p.value);
+      }
+      const data = tsList.map((ts) => {
+        const v = m.get(ts);
+        return v === undefined || v === null ? null : Number(v);
+      });
+      return { label: ds.label, data, tension: 0.15 };
+    });
 
     chartRef.current.data.labels = labels;
-    chartRef.current.data.datasets = (datasets || []).map((ds) => ({
-      label: ds.label,
-      data: (ds.points || []).map((p) => p.value),
-      tension: 0.15,
-    }));
-
+    chartRef.current.data.datasets = chartDatasets;
     chartRef.current.update();
   }, [datasets]);
 
