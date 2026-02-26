@@ -1,0 +1,10 @@
+tenant: demo
+device_id: rfsite-001
+transport: http
+
+sample_interval_s: 5
+
+http:
+  base_url: "http://localhost:8000"
+  api_key: "dev-key"
+  timeout_s: 5
