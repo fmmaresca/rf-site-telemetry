@@ -1,0 +1,28 @@
+[Unit]
+Description=RF Site Telemetry HTTP Simulator
+After=network-online.target rfsite-cloud-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=rfdemo
+Group=nogroup
+WorkingDirectory=/opt/rfsite
+EnvironmentFile=/etc/rfsite-cloud-api/env
+
+ExecStart=/opt/rfsite/venv/bin/python /opt/rfsite/tools/simulator/sim_http.py \
+  --base-url https://rfdemo.fmaresca.com/api \
+  --api-key ${SIM_API_KEY} \
+  --tenant demo \
+  --devices 25 \
+  --interval-s 5 \
+  --duplicate-rate 0.02 \
+  --drop-rate 0.005 \
+  --drop-min-s 60 \
+  --drop-max-s 180
+
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
