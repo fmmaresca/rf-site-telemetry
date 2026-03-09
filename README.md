@@ -51,20 +51,20 @@ python -m venv .venv && . .venv/bin/activate
 pip install -e .
 export DB_DSN='postgresql://rftelemetry:rftelemetry@localhost:5432/rftelemetry'
 export AUTH_REQUIRED=0
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8001
 ```
 
 Health check:
 
 ```bash
-curl -s http://127.0.0.1:8000/healthz
+curl -s http://127.0.0.1:8001/healthz
 ```
 
 ### 3) Send telemetry (simulator)
 
 ```bash
 python3 tools/simulator/sim_http.py \
-  --base-url http://127.0.0.1:8000 \
+  --base-url http://127.0.0.1:8001 \
   --tenant demo \
   --devices 5 \
   --interval-s 5
@@ -75,7 +75,7 @@ python3 tools/simulator/sim_http.py \
 ```bash
 cd dashboard
 npm install
-VITE_API_BASE=http://127.0.0.1:8000 npm run dev
+VITE_API_BASE=http://127.0.0.1:8001 npm run dev
 ```
 
 Open http://127.0.0.1:5173
