@@ -36,12 +36,36 @@ class Settings(BaseSettings):
         config_data = {}
         config_file = kwargs.get('config_file') or os.getenv('CONFIG_FILE')
         
+        # Default config file locations to try
+        default_config_paths = [
+            '/etc/rfsite/cloud-api.yaml',
+            '/etc/rfsite-cloud-api/config.yaml',
+            './config.yaml'
+        ]
+        
+        # If no config file specified, try default locations
+        if not config_file:
+            for path in default_config_paths:
+                if Path(path).exists():
+                    config_file = path
+                    break
+        
+        # Log which config file we're using (or not using)
         if config_file and Path(config_file).exists():
+            print(f"Loading configuration from: {config_file}")
             try:
                 with open(config_file, 'r', encoding='utf-8') as f:
                     config_data = yaml.safe_load(f) or {}
+                print(f"Successfully loaded configuration from: {config_file}")
             except Exception as e:
                 print(f"Warning: Could not load config file {config_file}: {e}")
+        else:
+            if config_file:
+                print(f"Warning: Config file not found: {config_file}")
+            print("Using default configuration and environment variables")
+        
+        # Store the config file path for later reference
+        self._config_file_used = config_file if config_file and Path(config_file).exists() else None
         
         # Merge config file data with kwargs, giving precedence to kwargs (env vars)
         merged_data = {**config_data, **kwargs}
@@ -123,6 +147,14 @@ class Settings(BaseSettings):
 # Global settings instance
 settings = Settings()
 
-# Create application logger
+# Create application logger and log startup info
 app_logger = logging.getLogger('app')
 app_logger.info("RF Site Telemetry Cloud API starting up")
+if settings._config_file_used:
+    app_logger.info(f"Configuration loaded from: {settings._config_file_used}")
+else:
+    app_logger.info("Using default configuration and environment variables")
+app_logger.info(f"Database DSN: {settings.db_dsn}")
+app_logger.info(f"Auth required: {settings.auth_required}")
+app_logger.info(f"Log file: {settings.logging.file_path}")
+app_logger.info(f"Log level: {settings.logging.level}")
