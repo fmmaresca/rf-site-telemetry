@@ -8,7 +8,12 @@ Type=simple
 User=www-data
 Group=www-data
 WorkingDirectory=/opt/rfsite/cloud-api
-EnvironmentFile=/etc/rfsite-cloud-api/env
+
+# Use config file instead of env file
+Environment=CONFIG_FILE=/etc/rfsite/cloud-api.yaml
+
+# Optional: fallback env file for additional overrides
+EnvironmentFile=-/etc/rfsite/cloud-api.env
 
 # Ajustá path al venv real
 ExecStart=/opt/rfsite/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8001
@@ -21,7 +26,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/rfsite /tmp
+ReadWritePaths=/opt/rfsite /tmp /var/log/rfsite
 
 [Install]
 WantedBy=multi-user.target
