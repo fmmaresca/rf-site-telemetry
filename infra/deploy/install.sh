@@ -43,13 +43,39 @@ check_database_exists() {
         return 1
     fi
     
-    # Extract database name from DSN
-    local db_name=$(echo "$dsn" | sed -n 's/.*\/\([^?]*\).*/\1/p')
-    local host=$(echo "$dsn" | sed -n 's/.*@\([^:]*\).*/\1/p')
-    local user=$(echo "$dsn" | sed -n 's/.*:\/\/\([^:]*\).*/\1/p')
+    # Parse DSN: postgresql://user:password@host:port/database
+    # Extract components using more robust parsing
+    local user=$(echo "$dsn" | sed -n 's|postgresql://\([^:]*\):.*|\1|p')
+    local password=$(echo "$dsn" | sed -n 's|postgresql://[^:]*:\([^@]*\)@.*|\1|p')
+    local host=$(echo "$dsn" | sed -n 's|.*@\([^:]*\):.*|\1|p')
+    local port=$(echo "$dsn" | sed -n 's|.*@[^:]*:\([^/]*\)/.*|\1|p')
+    local db_name=$(echo "$dsn" | sed -n 's|.*/\([^?]*\).*|\1|p')
+    
+    # Fallback for host without port
+    if [[ -z "$host" ]]; then
+        host=$(echo "$dsn" | sed -n 's|.*@\([^/]*\)/.*|\1|p')
+        port="5432"
+    fi
     
     if [[ -n "$db_name" && -n "$host" && -n "$user" ]]; then
-        PGPASSWORD="" psql -h "$host" -U "$user" -d "$db_name" -c "SELECT 1;" >/dev/null 2>&1
+        # Set password if available
+        if [[ -n "$password" ]]; then
+            export PGPASSWORD="$password"
+        fi
+        
+        # Use port if specified, otherwise default
+        local port_arg=""
+        if [[ -n "$port" ]]; then
+            port_arg="-p $port"
+        fi
+        
+        psql -h "$host" $port_arg -U "$user" -d "$db_name" -c "SELECT 1;" >/dev/null 2>&1
+        local result=$?
+        
+        # Clean up password from environment
+        unset PGPASSWORD
+        
+        return $result
     else
         return 1
     fi
