@@ -10,30 +10,33 @@ from typing import Optional
 import psycopg
 
 
-DEFAULT_ENV_FILE = "/etc/rfsite-cloud-api/env"
+DEFAULT_CONFIG_FILE = "/etc/rfsite-cloud-api/config.yaml"
 
 
-def load_env_file(path: str) -> None:
+def load_config_file(path: str) -> dict:
+    """Load configuration from YAML file"""
+    import yaml
+    
     p = Path(path)
     if not p.exists():
-        return
-    for line in p.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        k, v = line.split("=", 1)
-        k = k.strip()
-        v = v.strip().strip('"').strip("'")
-        os.environ.setdefault(k, v)
+        return {}
+    
+    try:
+        with open(p, 'r', encoding='utf-8') as f:
+            return yaml.safe_load(f) or {}
+    except Exception as e:
+        print(f"Warning: Could not load config file {path}: {e}")
+        return {}
 
 
-def resolve_db_dsn(db_dsn: Optional[str], env_file: str) -> str:
+def resolve_db_dsn(db_dsn: Optional[str], config_file: str) -> str:
     if db_dsn:
         return db_dsn
-    load_env_file(env_file)
-    dsn = os.getenv("DB_DSN")
+    
+    config = load_config_file(config_file)
+    dsn = config.get("db_dsn")
     if not dsn:
-        raise SystemExit("DB_DSN not set (use --db-dsn or set DB_DSN or provide --env-file)")
+        raise SystemExit("db_dsn not found (use --db-dsn or set db_dsn in config file)")
     return dsn
 
 
@@ -41,12 +44,12 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--tenant", required=True)
     ap.add_argument("--device", default=None, help="Optional device_id scope")
-    ap.add_argument("--env-file", default=DEFAULT_ENV_FILE)
+    ap.add_argument("--config", default=DEFAULT_CONFIG_FILE, help="Path to config file")
     ap.add_argument("--db-dsn", default=None)
     ap.add_argument("--key", default=None, help="Provide a key instead of generating one")
     args = ap.parse_args()
 
-    dsn = resolve_db_dsn(args.db_dsn, args.env_file)
+    dsn = resolve_db_dsn(args.db_dsn, args.config)
     api_key = args.key or secrets.token_urlsafe(32)
 
     with psycopg.connect(dsn) as conn:
