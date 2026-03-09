@@ -10,7 +10,7 @@ Group=www-data
 WorkingDirectory=/opt/rfsite/cloud-api
 
 # Ajustá path al venv real
-ExecStart=/opt/rfsite/venv/bin/rfsite-cloud-api --config /etc/rfsite-cloud-api/config.yaml
+ExecStart=/opt/rfsite/.venv/bin/rfsite-cloud-api --config /etc/rfsite-cloud-api/config.yaml
 
 Restart=always
 RestartSec=2

@@ -26,6 +26,9 @@ class Settings(BaseModel):
     
     # Logging
     logging: LoggingConfig = LoggingConfig()
+    
+    # Internal field to track config file used
+    config_file_used: str | None = None
 
     def __init__(self, config_file: str = "/etc/rfsite-cloud-api/config.yaml", **kwargs):
         # Load from config file
@@ -44,12 +47,12 @@ class Settings(BaseModel):
             print(f"Warning: Config file not found: {config_file}")
             print("Using default configuration")
         
-        # Store the config file path for later reference
-        self._config_file_used = config_file if Path(config_file).exists() else None
-        
         # Handle nested logging config
         if 'logging' in config_data and isinstance(config_data['logging'], dict):
             config_data['logging'] = LoggingConfig(**config_data['logging'])
+        
+        # Store the config file path for later reference
+        config_data['config_file_used'] = config_file if Path(config_file).exists() else None
         
         # Initialize with config data
         super().__init__(**config_data)
@@ -132,8 +135,8 @@ def initialize_settings(config_file: str = "/etc/rfsite-cloud-api/config.yaml") 
     # Create application logger and log startup info
     app_logger = logging.getLogger('app')
     app_logger.info("RF Site Telemetry Cloud API starting up")
-    if settings._config_file_used:
-        app_logger.info(f"Configuration loaded from: {settings._config_file_used}")
+    if settings.config_file_used:
+        app_logger.info(f"Configuration loaded from: {settings.config_file_used}")
     else:
         app_logger.info("Using default configuration")
     app_logger.info(f"Database DSN: {settings.db_dsn}")
