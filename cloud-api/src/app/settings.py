@@ -62,13 +62,8 @@ class Settings(BaseSettings):
         log_path = Path(self.logging.file_path)
         log_path.parent.mkdir(parents=True, exist_ok=True)
         
-        # Configure root logger
-        logger = logging.getLogger()
-        logger.setLevel(getattr(logging, self.logging.level.upper(), logging.INFO))
-        
-        # Remove existing handlers to avoid duplicates
-        for handler in logger.handlers[:]:
-            logger.removeHandler(handler)
+        # Configure specific loggers instead of root logger to avoid conflicts with uvicorn
+        log_level = getattr(logging, self.logging.level.upper(), logging.INFO)
         
         # File handler with daily rotation
         file_handler = logging.handlers.TimedRotatingFileHandler(
@@ -79,21 +74,55 @@ class Settings(BaseSettings):
             encoding='utf-8'
         )
         file_handler.suffix = '%Y-%m-%d'
-        
-        # Console handler for development
-        console_handler = logging.StreamHandler()
+        file_handler.setLevel(log_level)
         
         # Formatter
         formatter = logging.Formatter(
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
         file_handler.setFormatter(formatter)
-        console_handler.setFormatter(formatter)
         
-        # Add handlers
-        logger.addHandler(file_handler)
-        logger.addHandler(console_handler)
+        # Configure application loggers
+        app_loggers = [
+            'app',
+            'app.main',
+            'app.auth',
+            'app.db',
+            'uvicorn.access',
+            'uvicorn.error'
+        ]
+        
+        for logger_name in app_loggers:
+            logger = logging.getLogger(logger_name)
+            logger.setLevel(log_level)
+            
+            # Remove existing file handlers to avoid duplicates
+            for handler in logger.handlers[:]:
+                if isinstance(handler, (logging.FileHandler, logging.handlers.TimedRotatingFileHandler)):
+                    logger.removeHandler(handler)
+            
+            # Add our file handler
+            logger.addHandler(file_handler)
+            
+            # Ensure logs propagate to parent (for console output)
+            logger.propagate = True
+        
+        # Also configure root logger for any other logs
+        root_logger = logging.getLogger()
+        root_logger.setLevel(log_level)
+        
+        # Add file handler to root logger if not already present
+        has_file_handler = any(
+            isinstance(h, (logging.FileHandler, logging.handlers.TimedRotatingFileHandler))
+            for h in root_logger.handlers
+        )
+        if not has_file_handler:
+            root_logger.addHandler(file_handler)
 
 
 # Global settings instance
 settings = Settings()
+
+# Create application logger
+app_logger = logging.getLogger('app')
+app_logger.info("RF Site Telemetry Cloud API starting up")

@@ -51,6 +51,8 @@ python -m venv .venv && . .venv/bin/activate
 pip install -e .
 export DB_DSN='postgresql://rftelemetry:rftelemetry@localhost:5432/rftelemetry'
 export AUTH_REQUIRED=0
+export LOGGING__FILE_PATH='./logs/cloud-api.log'
+mkdir -p logs
 uvicorn app.main:app --reload --port 8001
 ```
 
