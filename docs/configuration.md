@@ -16,6 +16,10 @@ db_dsn: "postgresql://rftelemetry:rftelemetry@localhost:5432/rftelemetry"
 auth_required: true
 public_readonly_tenant: null  # e.g. "demo" for public access
 
+# Server settings
+host: "127.0.0.1"
+port: 8001
+
 # Logging configuration
 logging:
   level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL

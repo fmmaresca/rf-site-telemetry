@@ -20,14 +20,14 @@ def main():
     
     # Initialize settings with config file
     from .settings import initialize_settings
-    initialize_settings(args.config)
+    settings = initialize_settings(args.config)
     
     # Import and run the FastAPI app
     import uvicorn
     from .main import app
     
-    # Run uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8001)
+    # Run uvicorn with configured host and port
+    uvicorn.run(app, host=settings.host, port=settings.port)
 
 
 if __name__ == "__main__":

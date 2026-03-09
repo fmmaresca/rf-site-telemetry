@@ -20,6 +20,10 @@ class Settings(BaseModel):
     auth_required: bool = True
     public_readonly_tenant: str | None = None
     
+    # Server
+    host: str = "127.0.0.1"
+    port: int = 8001
+    
     # Logging
     logging: LoggingConfig = LoggingConfig()
 
@@ -134,6 +138,7 @@ def initialize_settings(config_file: str = "/etc/rfsite-cloud-api/config.yaml") 
         app_logger.info("Using default configuration")
     app_logger.info(f"Database DSN: {settings.db_dsn}")
     app_logger.info(f"Auth required: {settings.auth_required}")
+    app_logger.info(f"Server: {settings.host}:{settings.port}")
     app_logger.info(f"Log file: {settings.logging.file_path}")
     app_logger.info(f"Log level: {settings.logging.level}")
     
