@@ -9,14 +9,8 @@ User=www-data
 Group=www-data
 WorkingDirectory=/opt/rfsite/cloud-api
 
-# Use config file instead of env file
-Environment=CONFIG_FILE=/etc/rfsite/cloud-api.yaml
-
-# Optional: fallback env file for additional overrides
-EnvironmentFile=-/etc/rfsite/cloud-api.env
-
 # Ajustá path al venv real
-ExecStart=/opt/rfsite/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8001
+ExecStart=/opt/rfsite/venv/bin/rfsite-cloud-api --config /etc/rfsite-cloud-api/config.yaml
 
 Restart=always
 RestartSec=2

@@ -1,16 +1,10 @@
 # Configuration
 
-The RF Site Telemetry Cloud API supports flexible configuration through YAML files and environment variables.
-
-## Configuration Priority
-
-1. **Environment variables** (highest priority)
-2. **YAML configuration file**
-3. **Default values** (lowest priority)
+The RF Site Telemetry Cloud API uses a single YAML configuration file.
 
 ## Configuration File
 
-The default configuration file location is `/etc/rfsite/cloud-api.yaml`. You can override this with the `CONFIG_FILE` environment variable.
+The default configuration file location is `/etc/rfsite-cloud-api/config.yaml`. You can specify a different location using the `--config` command line option.
 
 ### Example Configuration
 
@@ -30,16 +24,9 @@ logging:
   backup_count: 30  # Keep 30 days of logs
 ```
 
-## Environment Variables
+## Command Line Options
 
-All configuration options can be overridden with environment variables:
-
-- `CONFIG_FILE` - Path to YAML config file
-- `DB_DSN` - Database connection string
-- `AUTH_REQUIRED` - Enable/disable authentication (true/false)
-- `PUBLIC_READONLY_TENANT` - Public tenant name for read-only access
-- `LOGGING__LEVEL` - Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-- `LOGGING__FILE_PATH` - Log file path
+- `--config` - Path to YAML config file (default: `/etc/rfsite-cloud-api/config.yaml`)
 
 ## Logging
 
@@ -63,28 +50,30 @@ Log files are automatically rotated daily with the format:
 
 ## Development Setup
 
-For local development, you can use environment variables or a local config file:
+For local development, create a local config file:
 
 ```bash
-# Using environment variables
-export DB_DSN='postgresql://rftelemetry:rftelemetry@localhost:5432/rftelemetry'
-export AUTH_REQUIRED=0
-export LOGGING__FILE_PATH='./logs/cloud-api.log'
+# Create a development config file
+cp cloud-api/config.example.yaml config.dev.yaml
 
-# Or using a config file
-export CONFIG_FILE='./config.dev.yaml'
+# Edit for development
+nano config.dev.yaml
+
+# Run with custom config
+rfsite-cloud-api --config config.dev.yaml
 ```
 
 ## Production Deployment
 
 1. Copy the example config:
    ```bash
-   sudo cp cloud-api/config.example.yaml /etc/rfsite/cloud-api.yaml
+   sudo mkdir -p /etc/rfsite-cloud-api
+   sudo cp cloud-api/config.example.yaml /etc/rfsite-cloud-api/config.yaml
    ```
 
 2. Edit the configuration:
    ```bash
-   sudo nano /etc/rfsite/cloud-api.yaml
+   sudo nano /etc/rfsite-cloud-api/config.yaml
    ```
 
 3. Create log directory:

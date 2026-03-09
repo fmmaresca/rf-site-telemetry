@@ -1,11 +1,8 @@
-import os
 import yaml
 import logging
 import logging.handlers
 from pathlib import Path
-from typing import Dict, Any
-from pydantic import BaseModel, Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import BaseModel
 
 
 class LoggingConfig(BaseModel):
@@ -15,67 +12,43 @@ class LoggingConfig(BaseModel):
     backup_count: int = 30  # 30 días de rotación
 
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-
+class Settings(BaseModel):
     # Database
     db_dsn: str = "postgresql://rftelemetry:rftelemetry@localhost:5432/rftelemetry"
     
     # Authentication
-    auth_required: bool = True  # in cloud: keep True; in local dev you can set AUTH_REQUIRED=0
-    public_readonly_tenant: str | None = None  # e.g. "demo"
+    auth_required: bool = True
+    public_readonly_tenant: str | None = None
     
     # Logging
-    logging: LoggingConfig = Field(default_factory=LoggingConfig)
-    
-    # Config file path (can be set via env var CONFIG_FILE)
-    config_file: str | None = None
+    logging: LoggingConfig = LoggingConfig()
 
-    def __init__(self, **kwargs):
-        # First load from config file if specified
+    def __init__(self, config_file: str = "/etc/rfsite-cloud-api/config.yaml", **kwargs):
+        # Load from config file
         config_data = {}
-        config_file = kwargs.get('config_file') or os.getenv('CONFIG_FILE')
         
-        # Default config file locations to try
-        default_config_paths = [
-            '/etc/rfsite/cloud-api.yaml',
-            '/etc/rfsite-cloud-api/config.yaml',
-            './config.yaml'
-        ]
-        
-        # If no config file specified, try default locations
-        if not config_file:
-            for path in default_config_paths:
-                if Path(path).exists():
-                    config_file = path
-                    break
-        
-        # Log which config file we're using (or not using)
-        if config_file and Path(config_file).exists():
+        if Path(config_file).exists():
             print(f"Loading configuration from: {config_file}")
             try:
                 with open(config_file, 'r', encoding='utf-8') as f:
                     config_data = yaml.safe_load(f) or {}
                 print(f"Successfully loaded configuration from: {config_file}")
             except Exception as e:
-                print(f"Warning: Could not load config file {config_file}: {e}")
+                print(f"Error: Could not load config file {config_file}: {e}")
+                raise
         else:
-            if config_file:
-                print(f"Warning: Config file not found: {config_file}")
-            print("Using default configuration and environment variables")
+            print(f"Warning: Config file not found: {config_file}")
+            print("Using default configuration")
         
         # Store the config file path for later reference
-        self._config_file_used = config_file if config_file and Path(config_file).exists() else None
-        
-        # Merge config file data with kwargs, giving precedence to kwargs (env vars)
-        merged_data = {**config_data, **kwargs}
+        self._config_file_used = config_file if Path(config_file).exists() else None
         
         # Handle nested logging config
         if 'logging' in config_data and isinstance(config_data['logging'], dict):
-            logging_config = LoggingConfig(**config_data['logging'])
-            merged_data['logging'] = logging_config
+            config_data['logging'] = LoggingConfig(**config_data['logging'])
         
-        super().__init__(**merged_data)
+        # Initialize with config data
+        super().__init__(**config_data)
         
         # Setup logging after initialization
         self._setup_logging()
@@ -144,17 +117,24 @@ class Settings(BaseSettings):
             root_logger.addHandler(file_handler)
 
 
-# Global settings instance
-settings = Settings()
+# Global settings instance - will be initialized in main.py
+settings: Settings | None = None
 
-# Create application logger and log startup info
-app_logger = logging.getLogger('app')
-app_logger.info("RF Site Telemetry Cloud API starting up")
-if settings._config_file_used:
-    app_logger.info(f"Configuration loaded from: {settings._config_file_used}")
-else:
-    app_logger.info("Using default configuration and environment variables")
-app_logger.info(f"Database DSN: {settings.db_dsn}")
-app_logger.info(f"Auth required: {settings.auth_required}")
-app_logger.info(f"Log file: {settings.logging.file_path}")
-app_logger.info(f"Log level: {settings.logging.level}")
+def initialize_settings(config_file: str = "/etc/rfsite-cloud-api/config.yaml") -> Settings:
+    """Initialize global settings with specified config file"""
+    global settings
+    settings = Settings(config_file=config_file)
+    
+    # Create application logger and log startup info
+    app_logger = logging.getLogger('app')
+    app_logger.info("RF Site Telemetry Cloud API starting up")
+    if settings._config_file_used:
+        app_logger.info(f"Configuration loaded from: {settings._config_file_used}")
+    else:
+        app_logger.info("Using default configuration")
+    app_logger.info(f"Database DSN: {settings.db_dsn}")
+    app_logger.info(f"Auth required: {settings.auth_required}")
+    app_logger.info(f"Log file: {settings.logging.file_path}")
+    app_logger.info(f"Log level: {settings.logging.level}")
+    
+    return settings

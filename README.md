@@ -49,11 +49,13 @@ docker compose -f infra/docker-compose.dev.yml up -d db
 cd cloud-api
 python -m venv .venv && . .venv/bin/activate
 pip install -e .
-export DB_DSN='postgresql://rftelemetry:rftelemetry@localhost:5432/rftelemetry'
-export AUTH_REQUIRED=0
-export LOGGING__FILE_PATH='./logs/cloud-api.log'
+
+# Create development config
+cp config.example.yaml config.dev.yaml
+# Edit config.dev.yaml to set auth_required: false and adjust paths
+
 mkdir -p logs
-uvicorn app.main:app --reload --port 8001
+rfsite-cloud-api --config config.dev.yaml
 ```
 
 Health check:

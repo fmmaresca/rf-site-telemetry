@@ -8,6 +8,11 @@ from fastapi import Depends, FastAPI, HTTPException
 from . import db
 from .auth import Principal, get_principal
 from .models import IngestResult, TelemetryBatchV1, TelemetryEventV1
+from .settings import settings, initialize_settings
+
+# Initialize settings with default config if not already initialized
+if settings is None:
+    initialize_settings()
 
 app = FastAPI(title="RF Site Telemetry Cloud API", version="0.2.0")
 
