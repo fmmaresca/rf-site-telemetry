@@ -21,3 +21,4 @@ venv/
 # Node (dashboard later)
 node_modules/
 dist/
+.aider*
